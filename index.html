@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HKJC 排位表</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft JhengHei', sans-serif; background: #0f1117; color: #e0e0e0; margin: 0; padding: 0; }
+  .container { max-width: 1500px; margin: 0 auto; padding: 16px; }
+
+  .controls { background: #1a1a2e; border: 1px solid #333; border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+  .controls h1 { color: #34d399; margin: 0 0 16px 0; font-size: 24px; }
+  .controls-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; align-items: end; }
+  .control-group { display: flex; flex-direction: column; gap: 6px; }
+  .control-group > label { font-size: 13px; color: #aaa; }
+  input[type="date"], input[type="number"], input[type="text"], select { background: #2a2a3e; border: 1px solid #444; color: #e0e0e0; border-radius: 6px; padding: 8px 12px; font-size: 14px; width: 100%; }
+  input[type="date"]:focus, input[type="number"]:focus, input[type="text"]:focus, select:focus { outline: none; border-color: #10b981; }
+  input[type="number"] { color-scheme: dark; }
+
+  .btn { border: none; border-radius: 8px; padding: 10px 20px; font-size: 14px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
+  .btn-primary { background: #10b981; color: #fff; }
+  .btn-primary:hover { background: #34d399; }
+  .btn-pdf { background: #10b981; color: #fff; text-decoration: none; display: inline-block; }
+  .btn-pdf:hover { background: #34d399; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-group { display: flex; gap: 8px; flex-wrap: wrap; }
+  .btn-sm { padding: 4px 10px; font-size: 12px; border-radius: 6px; }
+  .btn-ghost { background: #2a2a3e; color: #ccc; border: 1px solid #444; }
+  .btn-ghost:hover { border-color: #10b981; color: #34d399; }
+
+  .race-tabs { margin-top: 16px; display: none; }
+  .race-tabs .tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+  .race-tab { background: #2a2a3e; border: 1px solid #444; color: #ccc; border-radius: 6px; padding: 6px 14px; font-size: 14px; font-weight: bold; cursor: pointer; }
+  .race-tab:hover { border-color: #10b981; color: #34d399; }
+  .race-tab.active { background: #10b981; color: #fff; border-color: #10b981; }
+  .hint { font-size: 12px; color: #666; margin-top: 8px; }
+
+  /* 備忘馬 panel */
+  .memo-panel { background: #1a1a2e; border: 1px solid #333; border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+  .memo-panel h2 { color: #34d399; font-size: 18px; margin: 0 0 12px 0; }
+  .memo-form { display: grid; grid-template-columns: 1.3fr 0.55fr 1.6fr 0.7fr 0.75fr 0.75fr 0.75fr 0.9fr 0.75fr 1.1fr auto auto; gap: 10px; align-items: start; margin-bottom: 6px; }
+  @media (max-width: 1100px) { .memo-form { grid-template-columns: 1fr 1fr; } }
+  .memo-form .control-group label { font-size: 12px; }
+  .feat-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; min-height: 22px; }
+  .chip { background: #0f3d2e; border: 1px solid #1f7a55; color: #6ee7b7; border-radius: 20px; padding: 2px 10px; font-size: 12px; display: inline-flex; align-items: center; gap: 5px; }
+  .chip .x { cursor: pointer; color: #ff9c9c; font-weight: bold; }
+  .chip .x:hover { color: #ff5555; }
+  .chip-mini { background: #0f3d2e; border: 1px solid #1f7a55; color: #6ee7b7; border-radius: 20px; padding: 1px 8px; font-size: 11px; display: inline-block; margin: 1px 2px 1px 0; white-space: nowrap; }
+  /* 特徵 chip 自訂顏色（f.color 存 hex；'' = 預設綠；顏色用 inline style） */
+
+  table.data { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.data th { background: #2a2a3e; color: #34d399; padding: 8px 10px; text-align: left; border-bottom: 2px solid #10b981; white-space: nowrap; position: sticky; top: 0; }
+  table.data td { padding: 7px 10px; border-bottom: 1px solid #2e2e44; white-space: nowrap; }
+  table.data tr:hover td { background: #23233a; }
+  .horse-name { color: #7ec8ff; font-weight: bold; }
+  .reserve-box { margin-top: 20px; }
+  .reserve-box h3 { color: #ff9c5b; font-size: 15px; margin: 0 0 8px 0; }
+
+  /* matched memo rows highlight in main table */
+  tr.memo-hit td { background: rgba(16, 185, 129, 0.08); }
+  tr.memo-hit td:first-child { border-left: 3px solid #10b981; }
+
+  .race-badge { background: #10b981; color: #fff; border: none; border-radius: 6px; padding: 3px 10px; font-size: 12px; font-weight: bold; cursor: pointer; }
+  .race-badge:hover { background: #34d399; }
+  .race-badge-on { background: #a7f3d0; color: #064e3b; }
+  .add-btn { background: #0f3d2e; color: #6ee7b7; border: 1px solid #1f7a55; border-radius: 6px; padding: 2px 9px; font-size: 13px; font-weight: bold; cursor: pointer; }
+  .add-btn:hover { background: #10b981; color: #fff; }
+  .add-btn.in-memo { background: #2a2a3e; color: #777; border-color: #444; cursor: default; }
+  .memo-hit-count { color: #34d399; font-weight: bold; }
+
+  .hidden { display: none !important; }
+  .no-data, .loading { text-align: center; padding: 60px 40px; color: #666; }
+  .error-box { background: #3a1a1a; border: 1px solid #a33; border-radius: 8px; padding: 16px 20px; margin: 16px 0; color: #ffb3b3; }
+  .gear-note { color: #666; font-size: 12px; margin-top: 12px; line-height: 1.6; }
+  .toast { position: fixed; bottom: 24px; right: 24px; background: #10b981; color: #fff; padding: 10px 18px; border-radius: 8px; font-weight: bold; font-size: 14px; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 99; }
+  .toast.show { opacity: 1; }
+  .section-title { color: #34d399; font-size: 14px; font-weight: bold; margin: 14px 0 6px 0; }
+  .memo-empty { color: #666; font-size: 13px; padding: 8px 0; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="controls">
+    <h1>🏇 HKJC 排位表</h1>
+    <div class="controls-grid">
+      <div class="control-group">
+        <label>日期</label>
+        <input type="date" id="dateInput" />
+      </div>
+      <div class="control-group">
+        <label>場地</label>
+        <select id="venueSelect">
+          <option value="ST">沙田 (Sha Tin)</option>
+          <option value="HV">跑馬地 (Happy Valley)</option>
+        </select>
+      </div>
+      <div class="control-group">
+        <label>場次 (9 = 跑 1-9 場, 11 = 跑 1-11 場)</label>
+        <select id="raceCount" onchange="onRaceCountChange()">
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
+          <option value="5">5</option>
+          <option value="6">6</option>
+          <option value="7">7</option>
+          <option value="8">8</option>
+          <option value="9" selected>9</option>
+          <option value="10">10</option>
+          <option value="11">11</option>
+          <option value="custom">自訂</option>
+        </select>
+        <input type="number" id="raceCountCustom" min="1" max="12" placeholder="自訂場次 (1-12)" style="display:none;margin-top:6px;" />
+      </div>
+      <div class="control-group">
+        <div class="btn-group">
+          <button class="btn btn-primary" id="loadBtn" onclick="loadRaces()">📊 加載排位表</button>
+          <a class="btn btn-pdf hidden" id="pdfThisBtn" target="_blank">⬇️ 此場 PDF</a>
+          <a class="btn btn-pdf hidden" id="pdfAllBtn" target="_blank">⬇️ 全日 PDF</a>
+        </div>
+      </div>
+    </div>
+    <div class="race-tabs" id="raceTabs">
+      <div class="tabs" id="tabsBar"></div>
+      <div class="hint">場次 9 = 第 1 至 9 場，場次 11 = 第 1 至 11 場</div>
+    </div>
+  </div>
+
+  <!-- 備忘馬 panel -->
+  <div class="memo-panel">
+    <h2>📝 備忘馬 <span id="memoStats" style="font-size:13px;color:#888;font-weight:normal;"></span></h2>
+    <div class="memo-form">
+      <div class="control-group">
+        <label>馬名</label>
+        <input type="text" id="memoName" placeholder="例如：全能勇士" />
+      </div>
+      <div class="control-group">
+        <label>入圍(前二)</label>
+        <select id="memoShortlist" onchange="onShortlistChange()">
+          <option value="" selected>—</option>
+          <option value="🥇">🥇</option>
+          <option value="🥈">🥈</option>
+          <option value="🥉">🥉</option>
+          <option value="🎯">🎯</option>
+          <option value="❌">❌</option>
+        </select>
+      </div>
+      <div class="control-group">
+        <label>特徵</label>
+        <input type="text" id="memoFeat" placeholder="例如：早檔 / 前領 / 贏過 Machine..." />
+        <div class="feat-chips" id="memoFeatChips"></div>
+      </div>
+      <div class="control-group">
+        <label>特徵顏色</label>
+        <select id="featColorSelect" onchange="onFeatColorChange()">
+          <option value="#6ee7b7" selected>💚</option>
+          <option value="#fbbf24">💛</option>
+          <option value="#f87171">❤️</option>
+          <option value="#60a5fa">💙</option>
+          <option value="#c084fc">💜</option>
+          <option value="#f472b6">🩷</option>
+          <option value="#8b5a3c">🤎</option>
+          <option value="#e0e0e0">🤍</option>
+        </select>
+      </div>
+      <div class="control-group">
+        <label>熱錢前</label>
+        <input type="text" id="memoHotBefore" placeholder="例如 113/122" />
+      </div>
+      <div class="control-group">
+        <label>熱錢3'</label>
+        <input type="text" id="memoHot3" placeholder="例如 95/109" />
+      </div>
+      <div class="control-group">
+        <label>熱錢流向</label>
+        <input type="text" id="memoHotFlow" placeholder="例如 平穩" />
+      </div>
+      <div class="control-group">
+        <label>最後賠率</label>
+        <input type="text" id="memoOdds" placeholder="例如 67/70" />
+      </div>
+      <div class="control-group">
+        <label>最近 6 次名次</label>
+        <input type="text" id="memoLast6" placeholder="例如 3/13/1/2/5" />
+      </div>
+      <div class="control-group">
+        <label>&nbsp;</label>
+        <button class="btn btn-primary" id="memoSaveBtn" onclick="saveMemo()">➕ 加入</button>
+      </div>
+      <div class="control-group">
+        <label>&nbsp;</label>
+        <button class="btn btn-ghost" id="memoCancelBtn" onclick="cancelEdit()" style="display:none;">✖ 取消編輯</button>
+      </div>
+    </div>
+
+    <div class="section-title">🎯 有出賽的備忘馬 <span id="hitCount" class="memo-hit-count"></span> <label style="font-weight:normal;font-size:12px;color:#888;margin-left:8px;"><input type="checkbox" id="onlyTop2" onchange="renderHits()" /> 只睇上仗前二 🥇🥈</label> <span id="hitHint" style="color:#666;font-size:12px;font-weight:normal;">（加載排位表後自動比對，點場次 tab 只睇該場）</span></div>
+    <div style="overflow-x:auto;">
+      <table class="data" id="hitTable"></table>
+    </div>
+    <div class="memo-empty" id="hitEmpty">載入排位表後，這裡會顯示有出賽的備忘馬及所屬場次。</div>
+
+    <div class="section-title" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">📋 備忘馬清單
+      <label style="font-weight:normal;font-size:12px;color:#888;"><input type="checkbox" id="showAllMemo" onchange="renderMemoList()" /> 顯示所有備忘馬（預設隱藏；出賽中的備忘馬見上方「有出賽的備忘馬」）</label>
+      <span id="memoTools" style="display:none;gap:8px;margin-left:auto;align-items:center;flex-wrap:wrap;">
+        <input type="text" id="memoSearch" placeholder="搜尋馬名/特徵/熱錢..." oninput="renderMemoList()" onkeydown="if(event.key==='Escape'){this.value='';renderMemoList();}" style="width:220px;padding:5px 10px;font-size:13px;" />
+        <button class="btn btn-ghost btn-sm" onclick="clearMemoSearch()">清空</button>
+        <button class="btn btn-ghost btn-sm" onclick="exportXlsx()">📥 匯出</button>
+                <label class="btn btn-ghost btn-sm" style="margin:0;cursor:pointer;">📤 匯入<input type="file" id="xlsxFile" accept=".xlsx,.xls" style="display:none;" onchange="importXlsx(this)" /></label>
+      </span>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="data" id="memoTable"></table>
+    </div>
+    <div class="memo-empty" id="memoEmpty">未有備忘馬。可在排位表每行按「＋」快速加入，或在上方手動輸入。</div>
+  </div>
+
+  <div class="loading hidden" id="loadingDiv">⏳ 正在加載排位表…</div>
+  <div class="error-box hidden" id="errorBox"></div>
+
+  <div class="race-area hidden" id="raceArea">
+    <div class="race-header">
+      <div>
+        <div class="race-title" id="raceTitle"></div>
+        <div class="race-meta" id="raceMeta"></div>
+      </div>
+      <div class="fetch-time" id="fetchTime"></div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="data" id="mainTable"></table>
+    </div>
+    <div class="reserve-box hidden" id="reserveBox">
+      <h3>後備馬匹</h3>
+      <table class="data" id="reserveTable"></table>
+    </div>
+    <div class="gear-note" id="gearNote">配備: B=眼罩 BO=單邊眼罩 CP=羊毛面箍 PS=單邊半掩防沙眼罩 SB=羊毛額箍 SR=鼻箍 TT=繫舌帶 V=開縫眼罩 VO=單邊開縫眼罩 XB=交叉鼻箍 H=頭罩 P=防沙眼罩 E=耳塞 BK=閘氈；「1」首次「2」重戴「-」除去</div>
+  </div>
+
+  <div class="no-data" id="noData">
+    <div style="font-size:48px;margin-bottom:16px;">🏇</div>
+    <div>請選擇日期、場地和場次，然後點擊「加載排位表」</div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"
+        onerror="this.onerror=null;var s=document.createElement('script');s.src='/xlsx.full.min.js';document.head.appendChild(s);"></script>
+<script>
+  document.getElementById('dateInput').valueAsDate = new Date();
+  const $ = id => document.getElementById(id);
+  let cache = {};          // raceNo -> data
+  let editingName = null;  // memo edit state
+  let pendingFeats = [];   // feature chips being composed
+
+  // ============ 備忘馬 storage ============
+  const MEMO_KEY = 'hkjc_memo_horses_v1';
+  function loadMemo() {
+    try {
+      const list = JSON.parse(localStorage.getItem(MEMO_KEY)) || [];
+      // normalize: ensure new hot-money fields exist (backward compat with v2.2/2.3 data)
+      list.forEach(m => { m.features = (m.features || []).map(normFeat); m.shortlist = m.shortlist || ''; m.hotBefore = m.hotBefore || ''; m.hot3 = m.hot3 || ''; m.hotFlow = m.hotFlow || ''; m.odds = m.odds || ''; m.last6 = m.last6 || ''; });
+      return list;
+    } catch { return []; }
+  }
+  function saveMemoStore(list) {
+    localStorage.setItem(MEMO_KEY, JSON.stringify(list));
+  }
+  function esc(s) {
+    return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function toast(msg) {
+    const t = $('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(t._h);
+    t._h = setTimeout(() => t.classList.remove('show'), 1800);
+  }
+
+  // ============ 特徵 chips ============
+  const FEAT_DEFAULT_COLOR = '#6ee7b7';   // 預設綠色
+      let selectedFeatIdx = null;             // 點選嘅 chip index（改色用）
+      $('memoFeat').addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ',') {
+          e.preventDefault();
+          const v = e.target.value.trim().replace(/,+$/, '');
+          if (v && !pendingFeats.some(p => p.text === v)) {
+            pendingFeats.push({text: v, color: $('featColorSelect').value || FEAT_DEFAULT_COLOR});
+            $('featColorSelect').value = FEAT_DEFAULT_COLOR;   // 加完重設預設綠
+          }
+          e.target.value = '';
+          selectedFeatIdx = null;
+          renderFeatChips();
+        } else if (e.key === 'Backspace' && !e.target.value && pendingFeats.length) {
+          pendingFeats.pop();
+          renderFeatChips();
+        }
+      });
+      function onFeatColorChange() {
+        // 揀咗 chip → 改該 chip 顏色；冇揀 → 全部 pending chips 改色
+        const c = $('featColorSelect').value;
+        if (selectedFeatIdx !== null && pendingFeats[selectedFeatIdx]) {
+          pendingFeats[selectedFeatIdx].color = c;
+        } else {
+          pendingFeats.forEach(p => p.color = c);
+        }
+        renderFeatChips();
+      }
+      function renderFeatChips() {
+        $('memoFeatChips').innerHTML = pendingFeats.map((p, i) => {
+          const sel = selectedFeatIdx === i;
+          const st = p.color ? `border-color:${p.color};color:${p.color};` : '';
+          return `<span class="chip" style="${st}${sel ? 'outline:2px solid #fff;' : ''}" title="點選改色" onclick="selectFeat(${i})">${esc(p.text)}<span class="x" onclick="removeFeat(${i});event.stopPropagation();">×</span></span>`;
+        }).join('');
+      }
+      function onShortlistChange() {}   // 值由 saveMemo 直接讀取
+      function selectFeat(i) {
+        // 點 chip：選取/取消選取；選取時下拉切到該 chip 顏色
+        selectedFeatIdx = (selectedFeatIdx === i) ? null : i;
+        if (selectedFeatIdx !== null) $('featColorSelect').value = pendingFeats[i].color || FEAT_DEFAULT_COLOR;
+        renderFeatChips();
+      }
+      function removeFeat(i) {
+        pendingFeats.splice(i, 1);
+        if (selectedFeatIdx === i) selectedFeatIdx = null;
+        else if (selectedFeatIdx !== null && selectedFeatIdx > i) selectedFeatIdx--;
+        renderFeatChips();
+      }
+      // memoChipHtml: colored chip for tables (f can be string or {text,color}); '' color = default green (no inline style)
+      function memoChipHtml(f, colors) {
+        const text = typeof f === 'object' ? f.text : f;
+        const color = (typeof f === 'object' && f.color) || (colors && colors[text]) || '';
+        const st = color ? `border-color:${color};color:${color};` : '';
+        return `<span class="chip-mini" style="${st}">${esc(text)}</span>`;
+      }
+      function featColorsOf(m) {
+        const map = {};
+        (m.features || []).forEach(f => { if (typeof f === 'object' && f.color) map[f.text] = f.color; });
+        return map;
+      }
+    // normalize features to objects on load (backward compat with plain strings)
+    function normFeat(f) { return typeof f === 'string' ? {text: f, color: ''} : f; }
+
+  // ============ memo CRUD ============
+  function saveMemo() {
+    const name = $('memoName').value.trim();
+    if (!name) return alert('請輸入馬名');
+    const list = loadMemo();
+    const item = {
+      name,
+      features: [...pendingFeats],
+      shortlist: $('memoShortlist').value || '',
+      hotBefore: $('memoHotBefore').value.trim(),
+      hot3: $('memoHot3').value.trim(),
+      hotFlow: $('memoHotFlow').value.trim(),
+      odds: $('memoOdds').value.trim(),
+      last6: $('memoLast6').value.trim()
+    };
+    if (editingName) {
+      const i = list.findIndex(m => m.name === editingName);
+      if (i >= 0) list[i] = item;
+      editingName = null;
+      $('memoSaveBtn').textContent = '➕ 加入';
+      $('memoCancelBtn').style.display = 'none';
+      toast('已更新：' + name);
+    } else {
+      if (list.some(m => m.name === name)) return alert('此馬已在備忘清單，請用「編輯」修改');
+      list.push(item);
+      toast('已加入備忘：' + name);
+    }
+    saveMemoStore(list);
+    resetMemoForm();
+    renderMemoAll();
+  }
+  function resetMemoForm() {
+      $('memoName').value = ''; $('memoOdds').value = ''; $('memoLast6').value = ''; $('memoFeat').value = '';
+      $('memoHotBefore').value = ''; $('memoHot3').value = ''; $('memoHotFlow').value = '';
+      $('memoShortlist').value = '';
+      selectedFeatIdx = null;
+      pendingFeats = []; renderFeatChips();
+    }
+  function editMemo(name) {
+    const m = loadMemo().find(x => x.name === name);
+    if (!m) return;
+    editingName = name;
+    $('memoName').value = m.name;
+    $('memoOdds').value = m.odds || '';
+    $('memoLast6').value = m.last6 || '';
+    $('memoHotBefore').value = m.hotBefore || '';
+    $('memoHot3').value = m.hot3 || '';
+    $('memoHotFlow').value = m.hotFlow || '';
+    $('memoShortlist').value = m.shortlist || '';
+    pendingFeats = [...(m.features || [])];
+    selectedFeatIdx = null;
+    renderFeatChips();
+    $('memoSaveBtn').textContent = '💾 更新';
+    $('memoCancelBtn').style.display = '';
+    $('memoName').focus();
+  }
+  function cancelEdit() {
+    editingName = null;
+    resetMemoForm();
+    $('memoSaveBtn').textContent = '➕ 加入';
+    $('memoCancelBtn').style.display = 'none';
+  }
+  function deleteMemo(name) {
+    if (!confirm('刪除備忘馬：' + name + '？')) return;
+    saveMemoStore(loadMemo().filter(m => m.name !== name));
+    if (editingName === name) cancelEdit();
+    renderMemoAll();
+    toast('已刪除：' + name);
+  }
+
+  // ============ matching ============
+  function matchMemo() {
+    const memo = loadMemo();
+    if (!memo.length || !Object.keys(cache).length) return [];
+    const memoMap = new Map(memo.map(m => [m.name, m]));
+    const hits = [];
+    Object.keys(cache).map(Number).sort((a, b) => a - b).forEach(rn => {
+      (cache[rn].rows || []).forEach((row, i) => {
+        const name = (row[3] || '').trim();
+        if (memoMap.has(name)) {
+          hits.push({ raceNo: rn, rowIndex: i, memo: memoMap.get(name), row });
+        }
+      });
+    });
+    return hits;
+  }
+
+  // 上仗前二偵測：6次近績首個數字 = 上仗名次（1 或 2 即前二）
+  function isLastTop2(row) {
+    const form = (row[1] || '').trim();
+    if (!form || form === '-') return false;
+    const first = form.split('/')[0].replace(/[^0-9]/g, '');
+    return first === '1' || first === '2';
+  }
+
+  function renderHits() {
+    const all = matchMemo();
+    const top2Only = $('onlyTop2') && $('onlyTop2').checked;
+    const base = top2Only ? all.filter(x => isLastTop2(x.row)) : all;
+    const filter = window.memoRaceFilter;
+    const hits = filter ? base.filter(x => x.raceNo === filter) : base;
+    const totalBase = base.length;
+    const tbl = $('hitTable'), empty = $('hitEmpty');
+    $('hitCount').textContent = hits.length ? `(${hits.length})` : '';
+    if (!hits.length) {
+      tbl.innerHTML = '';
+      empty.style.display = Object.keys(cache).length ? 'none' : '';
+      if (Object.keys(cache).length) {
+        empty.style.display = '';
+        empty.textContent = top2Only
+          ? `沒有備忘馬上仗跑前二（有出賽共 ${all.length} 匹）。`
+          : filter
+            ? `第 ${filter} 場沒有備忘馬出賽（其他場次共 ${all.length} 匹）。`
+            : '本日排位表沒有任何備忘馬出賽。';
+      }
+      return;
+    }
+    empty.style.display = 'none';
+    let h = '<thead><tr><th>場次</th><th>馬號</th><th>馬名</th><th>入圍</th><th>特徵</th><th>熱錢前</th><th>熱錢3\'</th><th>熱錢流向</th><th>最後賠率</th><th>最近 6 次名次</th><th>操作</th></tr></thead><tbody>';
+    hits.forEach(x => {
+      const live6 = (x.row[1] || '').trim();
+      const rec6 = (x.memo.last6 || '').trim();
+      const six = live6 ? (rec6 && rec6 !== live6 ? `${live6} <span style="color:#888;">(記錄: ${esc(rec6)})</span>` : live6)
+                        : esc(rec6);
+      h += `<tr>
+        <td><button class="race-badge ${filter === x.raceNo ? 'race-badge-on' : ''}" onclick="setMemoRaceFilter(${x.raceNo})">第 ${x.raceNo} 場</button></td>
+        <td>${esc(x.row[0])}</td>
+        <td class="horse-name">${esc(x.memo.name)}</td>
+        <td style="font-size:16px;">${esc(x.memo.shortlist) || '-'}</td>
+        <td>${(x.memo.features || []).map(f => memoChipHtml(f)).join('') || '-'}</td>
+        <td>${esc(x.memo.hotBefore) || '-'}</td>
+        <td>${esc(x.memo.hot3) || '-'}</td>
+        <td>${esc(x.memo.hotFlow) || '-'}</td>
+        <td>${esc(x.memo.odds) || '-'}</td>
+        <td>${six || '-'}</td>
+        <td>
+          <button class="btn btn-ghost btn-sm" onclick="editMemo('${esc(x.memo.name).replace(/'/g, "\\'")}')">編輯</button>
+          <button class="btn btn-ghost btn-sm" style="color:#ff9c9c;" onclick="deleteMemo('${esc(x.memo.name).replace(/'/g, "\\'")}')">刪除</button>
+        </td>
+      </tr>`;
+    });
+    tbl.innerHTML = h + '</tbody>';
+  }
+
+  // race-tab <-> memo-hit-table linkage: clicking a race tab shows only that race's memo horses
+  function setMemoRaceFilter(rn) {
+    window.memoRaceFilter = (window.memoRaceFilter === rn) ? null : rn;
+    renderHits();
+    // sync tab highlight: active tab = filter (if that race exists in cache)
+    document.querySelectorAll('.race-tab').forEach(t => {
+      const tRn = parseInt(t.textContent.replace('第 ', '').replace(' 場', ''), 10);
+      t.classList.toggle('active', window.memoRaceFilter === tRn);
+    });
+    if (window.memoRaceFilter && cache[window.memoRaceFilter]) showRace(window.memoRaceFilter);
+  }
+
+  function runningNames() {
+    const set = new Set();
+    Object.values(cache).forEach(d => (d.rows || []).forEach(r => set.add((r[3] || '').trim())));
+    return set;
+  }
+
+  function renderMemoList() {
+    const memo = loadMemo();
+    const tbl = $('memoTable'), empty = $('memoEmpty');
+    const cacheEmpty = !Object.keys(cache).length;
+    $('memoStats').textContent = memo.length ? `共 ${memo.length} 匹` : '';
+    // 搜尋/匯出工具列只在「顯示所有備忘馬」勾選時出現
+    $('memoTools').style.display = $('showAllMemo').checked ? 'inline-flex' : 'none';
+    // 未點選「顯示所有備忘馬」→ 唔顯示清單（備忘馬清單預設隱藏）
+    if (!$('showAllMemo').checked) {
+      tbl.innerHTML = ''; empty.style.display = '';
+      empty.textContent = '（備忘馬清單已隱藏 — 有出賽的備忘馬見上方表。如需查看全部，請點選「顯示所有備忘馬」。）';
+      return;
+    }
+    if (!memo.length) {
+      tbl.innerHTML = ''; empty.style.display = '';
+      empty.textContent = '未有備忘馬。可在排位表每行按「＋」快速加入，或在上方手動輸入。';
+      return;
+    }
+    const running = runningNames();
+    // 搜尋 filter：馬名/特徵/熱錢前/熱錢3'/熱錢流向/賠率/名次 全欄位模糊比對
+    const q = ($('memoSearch').value || '').trim().toLowerCase();
+    let shown = memo;
+    if (q) {
+      shown = memo.filter(m =>
+        (m.name || '').toLowerCase().includes(q) ||
+        (m.shortlist || '').includes(q) ||
+        (m.features || []).some(f => ((f.text ?? f) || '').toLowerCase().includes(q)) ||
+        ['hotBefore','hot3','hotFlow','odds','last6'].some(k => (m[k] || '').toLowerCase().includes(q))
+      );
+    }
+    $('memoStats').textContent = memo.length
+      ? `共 ${memo.length} 匹` + (q ? `，搜尋到 ${shown.length}` : '') + (cacheEmpty ? '' : `，出賽中 ${memo.filter(m => running.has(m.name)).length}`)
+      : '';
+    if (!shown.length) {
+      tbl.innerHTML = ''; empty.style.display = '';
+      empty.textContent = q ? `沒有符合「${$('memoSearch').value}」的備忘馬。` : '未有備忘馬。';
+      return;
+    }
+    empty.style.display = 'none';
+    let h = '<thead><tr><th>馬名</th><th>入圍</th><th>特徵</th><th>熱錢前</th><th>熱錢3\'</th><th>熱錢流向</th><th>最後賠率</th><th>最近 6 次名次</th><th>出賽</th><th>操作</th></tr></thead><tbody>';
+    shown.forEach(m => {
+      const rn = Object.keys(cache).map(Number).find(rn => (cache[rn].rows || []).some(r => (r[3] || '').trim() === m.name));
+      const runCell = rn
+        ? `<button class="race-badge" onclick="showRace(${rn})">第 ${rn} 場</button>`
+        : '<span style="color:#666;">—</span>';
+      h += `<tr>
+        <td class="horse-name">${esc(m.name)}</td>
+        <td style="font-size:16px;">${esc(m.shortlist) || '-'}</td>
+        <td>${(m.features || []).map(f => memoChipHtml(f)).join('') || '-'}</td>
+        <td>${esc(m.hotBefore) || '-'}</td>
+        <td>${esc(m.hot3) || '-'}</td>
+        <td>${esc(m.hotFlow) || '-'}</td>
+        <td>${esc(m.odds) || '-'}</td>
+        <td>${esc(m.last6) || '-'}</td>
+        <td>${runCell}</td>
+        <td>
+          <button class="btn btn-ghost btn-sm" onclick="editMemo('${esc(m.name).replace(/'/g, "\\'")}')">編輯</button>
+          <button class="btn btn-ghost btn-sm" style="color:#ff9c9c;" onclick="deleteMemo('${esc(m.name).replace(/'/g, "\\'")}')">刪除</button>
+        </td>
+      </tr>`;
+    });
+    tbl.innerHTML = h + '</tbody>';
+  }
+
+  function clearMemoSearch() { $('memoSearch').value = ''; renderMemoList(); }
+
+  // ============ XLSX 匯出 / 匯入 (SheetJS, UTF-8) ============
+  const XLSX_COLS = ['馬名', '入圍', '特徵', '熱錢前', "熱錢3'", '熱錢流向', '最後賠率', '最近 6 次名次'];
+  function exportXlsx() {
+    if (!window.XLSX) return alert('XLSX 庫未載入（需要網絡連線載入 SheetJS）。');
+    const memo = loadMemo();
+    if (!memo.length) return alert('未有備忘馬可匯出');
+    const rows = memo.map(m => ({
+      '馬名': m.name || '',
+      '入圍': m.shortlist || '',
+      '特徵': (m.features || []).map(f => (f.text ?? f) + (f.color ? ` [色:${f.color}]` : '')).join(' / '),
+      '熱錢前': m.hotBefore || '',
+      "熱錢3'": m.hot3 || '',
+      '熱錢流向': m.hotFlow || '',
+      '最後賠率': m.odds || '',
+      '最近 6 次名次': m.last6 || ''
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows, { header: XLSX_COLS });
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '備忘馬');
+    XLSX.writeFile(wb, `hkjc_memo_horses_${new Date().toISOString().slice(0,10)}.xlsx`);
+    toast('已匯出 ' + memo.length + ' 匹備忘馬 (XLSX)');
+  }
+  function importXlsx(input) {
+    const file = input.files && input.files[0];
+    input.value = '';   // allow re-selecting the same file
+    if (!file) return;
+    if (!window.XLSX) return alert('XLSX 庫未載入（需要網絡連線載入 SheetJS）。');
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array', codepage: 65001 });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+        if (!rows.length) return alert('XLSX 內無資料列');
+        // header mapping: exact or fuzzy contains
+        const pick = (obj, keys) => {
+          for (const k of Object.keys(obj)) {
+            const kk = String(k).trim();
+            if (keys.some(t => kk === t || kk.includes(t))) return String(obj[k]).trim();
+          }
+          return '';
+        };
+        const list = loadMemo();
+        let added = 0, updated = 0, skipped = 0;
+        rows.forEach(r => {
+          const name = pick(r, ['馬名', '馬', '名', 'name']);
+          if (!name) { skipped++; return; }
+          const shortlist = pick(r, ['入圍', '前二', 'shortlist']);
+          const featStr = pick(r, ['特徵', '標籤', 'feature']);
+            const features = featStr ? featStr.split(/[\/,、;；]/).map(s => {
+              s = s.trim();
+              // support [色:#hex] suffix from our own export
+              const m2 = s.match(/^(.*?)\s*\[色:(#[0-9a-fA-F]{3,8})\]$/);
+              return m2 ? {text: m2[1].trim(), color: m2[2]} : {text: s, color: ''};
+            }).filter(f => f.text) : [];
+          const item = {
+            name,
+            shortlist,
+            features,
+            hotBefore: pick(r, ['熱錢前', 'hot before', '前']),
+            hot3: pick(r, ["熱錢3'", '熱錢3', "3'", 'hot 3']),
+            hotFlow: pick(r, ['熱錢流向', '流向', 'flow']),
+            odds: pick(r, ['最後賠率', '賠率', 'odds']),
+            last6: pick(r, ['最近 6 次名次', '最近6次名次', '名次', 'last6', '近績'])
+          };
+          const i = list.findIndex(m => m.name === name);
+          if (i >= 0) { list[i] = item; updated++; }
+          else { list.push(item); added++; }
+        });
+        saveMemoStore(list);
+        renderMemoAll();
+        toast(`匯入完成：新增 ${added}，更新 ${updated}` + (skipped ? `，跳過 ${skipped}` : ''));
+      } catch (err) {
+        alert('匯入失敗：' + err.message);
+      }
+    };
+    reader.readAsArrayBuffer(file);   // Uint8Array + codepage 65001 = UTF-8 safe for 中文
+  }
+
+  function renderMemoAll() { renderHits(); renderMemoList(); refreshMainTableMarks(); }
+
+  // quick-add from racecard row
+  function addFromRow(raceNo, i) {
+    const row = cache[raceNo].rows[i];
+    const name = (row[3] || '').trim();
+    if (!name) return;
+    const list = loadMemo();
+    if (list.some(m => m.name === name)) { toast('已在備忘：' + name); return; }
+    list.push({ name, features: [], hotBefore: '', hot3: '', hotFlow: '', odds: '', last6: (row[1] || '').trim() });
+    saveMemoStore(list);
+    renderMemoAll();
+    toast('已加入備忘：' + name + '（6次近績已填）');
+  }
+
+  function isMemo(name) { return loadMemo().some(m => m.name === (name || '').trim()); }
+
+  function refreshMainTableMarks() {
+    if (!Object.keys(cache).length) return;
+    const rn = Number($('raceTitle').dataset.raceNo || 0);
+    if (!rn || !cache[rn]) return;
+    // re-mark rows without rebuilding table
+    const tbl = $('mainTable');
+    const tbody = tbl.querySelector('tbody');
+    if (!tbody || !cache[rn].rows) return;
+    Array.from(tbody.rows).forEach((tr, i) => {
+      const name = (cache[rn].rows[i]?.[3] || '').trim();
+      const hit = isMemo(name);
+      tr.classList.toggle('memo-hit', hit);
+      const btn = tr.querySelector('.add-btn');
+      if (btn) {
+        btn.textContent = hit ? '✓' : '＋';
+        btn.classList.toggle('in-memo', hit);
+      }
+    });
+  }
+
+  // ============ racecard loading ============
+  // 場次下拉：選「自訂」→ 顯示 number input；否則用 select 值
+  function onRaceCountChange() {
+    const v = $('raceCount').value;
+    $('raceCountCustom').style.display = v === 'custom' ? '' : 'none';
+    if (v === 'custom') $('raceCountCustom').focus();
+  }
+  function getRaceCount() {
+    const v = $('raceCount').value;
+    const n = v === 'custom' ? parseInt($('raceCountCustom').value, 10) : parseInt(v, 10);
+    return n;
+  }
+
+  async function loadRaces() {
+    const dateStr = $('dateInput').value;
+    const venue = $('venueSelect').value;
+    const maxRace = getRaceCount();
+    if (!dateStr) return alert('請選擇日期');
+    if (!(maxRace >= 1 && maxRace <= 12)) return alert('場次請輸入 1-12');
+
+    $('loadBtn').disabled = true;
+    $('errorBox').classList.add('hidden');
+    $('raceArea').classList.add('hidden');
+    $('noData').classList.add('hidden');
+    $('loadingDiv').classList.remove('hidden');
+
+    const results = await Promise.allSettled(
+      Array.from({length: maxRace}, (_, i) =>
+        fetch(`/api/racecard?date=${dateStr}&course=${venue}&raceno=${i + 1}`).then(r => r.json())
+      )
+    );
+    cache = {};
+    const okRaces = [];
+    let firstError = null;
+    results.forEach((res, i) => {
+      const rn = i + 1;
+      if (res.status === 'fulfilled' && res.value && !res.value.error) {
+        cache[rn] = res.value;
+        okRaces.push(rn);
+      } else if (!firstError) {
+        firstError = (res.value && res.value.error) || (res.reason && String(res.reason)) || '未知錯誤';
+      }
+    });
+
+    $('loadingDiv').classList.add('hidden');
+    $('loadBtn').disabled = false;
+
+    if (okRaces.length === 0) {
+      $('errorBox').textContent = '❌ ' + (firstError || '無任何場次有排位資料');
+      $('errorBox').classList.remove('hidden');
+      $('noData').classList.remove('hidden');
+      renderMemoAll();   // clear hits
+      return;
+    }
+
+    const bar = $('tabsBar');
+    bar.innerHTML = '';
+    okRaces.forEach(rn => {
+      const b = document.createElement('button');
+      b.className = 'race-tab';
+      b.textContent = '第 ' + rn + ' 場';
+      b.onclick = () => showRace(rn);
+      bar.appendChild(b);
+    });
+    $('raceTabs').style.display = 'block';
+    window.memoRaceFilter = null;   // reset filter on new load
+    renderMemoAll();
+    showRace(okRaces[0]);
+  }
+
+  function showRace(rn) {
+    const d = cache[rn];
+    if (!d) return;
+    window.memoRaceFilter = rn;   // tab click = filter memo hits to this race
+    renderHits();                 // keep memo-hit table in sync with tab
+    document.querySelectorAll('.race-tab').forEach(t =>
+      t.classList.toggle('active', t.textContent === '第 ' + rn + ' 場'));
+
+    $('raceTitle').textContent = d.race_title || ('第 ' + rn + ' 場');
+    $('raceTitle').dataset.raceNo = rn;
+    $('raceMeta').innerHTML = [d.race_line1, d.race_line2, d.race_line3]
+      .filter(Boolean).map(x => x.replace(/,/g, '，')).join('<br>');
+    $('fetchTime').textContent = '已加載 ' + (d.fetched || '');
+
+    const tbl = $('mainTable');
+    let html = '<thead><tr>' + (d.header || []).map(h => '<th>' + h + '</th>').join('') + '<th>備忘</th></tr></thead><tbody>';
+    (d.rows || []).forEach((r, i) => {
+      const hit = isMemo(r[3]);
+      html += `<tr class="${hit ? 'memo-hit' : ''}">` + r.map((c, j) => {
+        const cls = j === 3 ? ' class="horse-name"' : '';
+        return '<td' + cls + '>' + (c || '') + '</td>';
+      }).join('');
+      html += `<td><button class="add-btn ${hit ? 'in-memo' : ''}" onclick="addFromRow(${rn}, ${i})">${hit ? '✓' : '＋'}</button></td></tr>`;
+    });
+    html += '</tbody>';
+    tbl.innerHTML = html;
+
+    if (d.reserve_rows && d.reserve_rows.length) {
+      $('reserveBox').classList.remove('hidden');
+      let rh = '<thead><tr>' + (d.reserve_header || []).map(h => '<th>' + h + '</th>').join('') + '</tr></thead><tbody>';
+      d.reserve_rows.forEach(r => { rh += '<tr>' + r.map(c => '<td>' + (c || '') + '</td>').join('') + '</tr>'; });
+      rh += '</tbody>';
+      $('reserveTable').innerHTML = rh;
+    } else {
+      $('reserveBox').classList.add('hidden');
+    }
+
+    const pdfThis = $('pdfThisBtn'), pdfAll = $('pdfAllBtn');
+    if (d.pdf_this) {
+      pdfThis.href = '/api/pdf?u=' + encodeURIComponent(d.pdf_this);
+      pdfThis.classList.remove('hidden');
+    } else pdfThis.classList.add('hidden');
+    if (d.pdf_all) {
+      pdfAll.href = '/api/pdf?u=' + encodeURIComponent(d.pdf_all);
+      pdfAll.classList.remove('hidden');
+    } else pdfAll.classList.add('hidden');
+
+    $('raceArea').classList.remove('hidden');
+  }
+
+  // init
+  if (location.protocol === 'file:') {
+    // opened as a local file — the API server (serve.py) can't be reached from file://
+    $('errorBox').innerHTML = '❌ 請勿直接雙擊 index.html — 請雙擊 <b>start.bat</b> 啟動本機伺服器，' +
+      '瀏覽器會自動開啟程式（http://localhost:8094）。<br>' +
+      '詳情見 README。（錯誤: Failed to fetch — file:// 唔可以連接本機 API）';
+    $('errorBox').classList.remove('hidden');
+  }
+  renderMemoAll();
+</script>
+</body>
+</html>
