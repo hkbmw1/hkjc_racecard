@@ -684,6 +684,66 @@
     });
   }
 
+  // ============ GitHub Pages mode (no backend: fetch via r.jina.ai + client-side parse) ============
+  let GITHUB_MODE = false;
+  async function detectMode() {
+    try {
+      const h = await fetch('/api/health', {signal: AbortSignal.timeout(2500)});
+      GITHUB_MODE = !(h && h.ok);
+    } catch { GITHUB_MODE = true; }   // no backend => github/static mode
+  }
+  function ghClean(s) {
+    return (s || '').replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').trim();
+  }
+  function ghParseRacecard(html, racedate, course, raceno) {
+    const out = {racedate, course, raceno};
+    const m = html.match(/<span class="font_wb"\s*\/?>(第\s*\d+\s*場\s*-\s*[^<]+)<\/span><br>([^<]+)<br>([^<]+)<br>([^<]+)/);
+    if (m) { out.race_title = ghClean(m[1]); out.race_line1 = ghClean(m[2]);
+             out.race_line2 = ghClean(m[3]); out.race_line3 = ghClean(m[4]); }
+    const pdfs = [...html.matchAll(/href="([^"]*?\/PDF\/RaceCard\/[^"]+?\.pdf)"/g)].map(x => x[1]);
+    const abs = p => p && p.startsWith('/') ? 'https://racing.hkjc.com' + p : p;
+    out.pdf_this = raceno ? abs(pdfs.find(p => p.includes('_r' + raceno + '_chi.pdf'))) : null;
+    out.pdf_all = abs(pdfs.find(p => p.includes('_all_chi.pdf')));
+    const rts = new Set([...html.matchAll(/racecard\?[^"'#]*?RaceNo=(\d+)/g)].map(x => parseInt(x[1])));
+    if (raceno) rts.add(raceno);
+    out.available_races = [...rts].sort((a,b) => a-b);
+    function parseRows(tblHtml) {
+      const rows = [];
+      for (const tr of tblHtml.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/g)) {
+        const cells = [...tr[1].matchAll(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/g)]
+          .map(td => ghClean(td[1]).replace(/\s+/g, ' '));
+        if (cells.length) rows.push(cells);
+      }
+      return rows;
+    }
+    const tables = [...html.matchAll(/<table[^>]*>([\s\S]*?)<\/table>/g)].map(t => t[0]);
+    out.header = []; out.rows = []; out.reserve_header = []; out.reserve_rows = [];
+    const main = tables.find(t => t.includes('horseid'));
+    if (main) {
+      const data = parseRows(main).filter(r => r.length >= 10);
+      const hi = data.findIndex(r => r[0] === '馬匹編號');
+      if (hi >= 0) { out.header = data[hi]; out.rows = data.slice(hi + 1); }
+      else out.rows = data;
+    }
+    const mr = html.match(/後\s*備\s*馬\s*匹[\s\S]*?<table[^>]*>([\s\S]*?)<\/table>/);
+    if (mr) {
+      const rdata = parseRows(mr[1]).filter(r => r.length >= 5);
+      const hi = rdata.findIndex(r => r.some(c => c === '馬名'));
+      if (hi >= 0) { out.reserve_header = rdata[hi]; out.reserve_rows = rdata.slice(hi + 1); }
+      else out.reserve_rows = rdata;
+    }
+    out.fetched = new Date().toTimeString().slice(0, 8);
+    return out;
+  }
+  async function ghFetchRacecard(dateStr, venue, raceno) {
+    const hkjc = `https://racing.hkjc.com/zh-hk/local/information/racecard?racedate=${dateStr.replace(/-/g, '/')}&Racecourse=${venue}&RaceNo=${raceno}`;
+    const resp = await fetch('https://r.jina.ai/' + hkjc, {headers: {'X-Return-Format': 'html'}});
+    if (!resp.ok) throw new Error('jina ' + resp.status);
+    const html = await resp.text();
+    if (!html.includes('horseid')) throw new Error('無排位資料 — 可能日期/場地唔啱或者未有排位');
+    return ghParseRacecard(html, dateStr.replace(/-/g, '/'), venue, raceno);
+  }
+
   // ============ racecard loading ============
   // 場次下拉：選「自訂」→ 顯示 number input；否則用 select 值
   function onRaceCountChange() {
@@ -710,23 +770,38 @@
     $('noData').classList.add('hidden');
     $('loadingDiv').classList.remove('hidden');
 
+    const fetchOne = (i) => GITHUB_MODE
+      ? ghFetchRacecard(dateStr, venue, i + 1)
+      : fetch(`/api/racecard?date=${dateStr}&course=${venue}&raceno=${i + 1}`).then(r => r.json());
     const results = await Promise.allSettled(
-      Array.from({length: maxRace}, (_, i) =>
-        fetch(`/api/racecard?date=${dateStr}&course=${venue}&raceno=${i + 1}`).then(r => r.json())
-      )
+      Array.from({length: maxRace}, (_, i) => fetchOne(i))
     );
     cache = {};
     const okRaces = [];
     let firstError = null;
+    let serverDown = false;
     results.forEach((res, i) => {
       const rn = i + 1;
       if (res.status === 'fulfilled' && res.value && !res.value.error) {
         cache[rn] = res.value;
         okRaces.push(rn);
       } else if (!firstError) {
-        firstError = (res.value && res.value.error) || (res.reason && String(res.reason)) || '未知錯誤';
+        // server down returns index.html (DOCTYPE) or network error -> both read as server-down
+        const reason = (res.value && res.value.error) || (res.reason && String(res.reason)) || '未知錯誤';
+        serverDown = /DOCTYPE|Unexpected token|Failed to fetch|NetworkError|Load failed/i.test(reason);
+        firstError = reason;
       }
     });
+    if (serverDown && okRaces.length === 0) {
+      $('loadingDiv').classList.add('hidden');
+      $('loadBtn').disabled = false;
+      $('errorBox').innerHTML = '❌ 本機伺服器未運行 — 請雙擊 <b>start_server.vbs</b>（或 start.bat）啟動，' +
+        '等幾秒後再撳「加載排位表」。<br><span style="color:#888;font-size:12px;">技術詳情: ' +
+        firstError.replace(/[<>]/g, '') + '</span>';
+      $('noData').classList.remove('hidden');
+      renderMemoAll();
+      return;
+    }
 
     $('loadingDiv').classList.add('hidden');
     $('loadBtn').disabled = false;
@@ -793,11 +868,11 @@
 
     const pdfThis = $('pdfThisBtn'), pdfAll = $('pdfAllBtn');
     if (d.pdf_this) {
-      pdfThis.href = '/api/pdf?u=' + encodeURIComponent(d.pdf_this);
+      pdfThis.href = GITHUB_MODE ? d.pdf_this : '/api/pdf?u=' + encodeURIComponent(d.pdf_this);
       pdfThis.classList.remove('hidden');
     } else pdfThis.classList.add('hidden');
     if (d.pdf_all) {
-      pdfAll.href = '/api/pdf?u=' + encodeURIComponent(d.pdf_all);
+      pdfAll.href = GITHUB_MODE ? d.pdf_all : '/api/pdf?u=' + encodeURIComponent(d.pdf_all);
       pdfAll.classList.remove('hidden');
     } else pdfAll.classList.add('hidden');
 
@@ -805,6 +880,7 @@
   }
 
   // init
+  detectMode();
   if (location.protocol === 'file:') {
     // opened as a local file — the API server (serve.py) can't be reached from file://
     $('errorBox').innerHTML = '❌ 請勿直接雙擊 index.html — 請雙擊 <b>start.bat</b> 啟動本機伺服器，' +
