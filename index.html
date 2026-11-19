@@ -160,8 +160,12 @@
           <option value="#60a5fa">💙</option>
           <option value="#c084fc">💜</option>
           <option value="#f472b6">🩷</option>
-          <option value="#8b5a3c">🤎</option>
           <option value="#e0e0e0">🤍</option>
+          <option value="#8b5a3c">🤎</option>
+          <option value="#67e8f9">🩵</option>
+          <option value="#333333">🖤</option>
+          <option value="#9ca3af">🩶</option>
+          <option value="#fb923c">🧡</option>
         </select>
       </div>
       <div class="control-group">
@@ -300,7 +304,7 @@
       function renderFeatChips() {
         $('memoFeatChips').innerHTML = pendingFeats.map((p, i) => {
           const color = p.color || FEAT_DEFAULT_COLOR;
-          const st = `border-color:${color};color:${color};background:${color}22;`;
+          const st = `border-color:${color};color:${featTextColor(color)};background:${color}22;`;
           return `<span class="chip" style="${st}">${esc(p.text)}<span class="x" onclick="removeFeat(${i});event.stopPropagation();">×</span></span>`;
         }).join('');
       }
@@ -310,11 +314,13 @@
         renderFeatChips();
       }
       // memoChipHtml: colored chip for tables (f can be string or {text,color}); '' color = default green (no inline style)
+      const FEAT_TEXT_OVERRIDE = {'#333333': '#ffffff'};   // 🖤 黑色 chip 文字用白色（深底睇唔到黑字）
+      function featTextColor(color) { return FEAT_TEXT_OVERRIDE[color.toLowerCase()] || color; }
       function memoChipHtml(f, colors) {
         const text = typeof f === 'object' ? f.text : f;
         const color = (typeof f === 'object' && f.color) || (colors && colors[text]) || FEAT_DEFAULT_COLOR;
-        // 底色 = 顏色嘅半透明版（同色系）；文字同邊框 = 特徵顏色
-        const st = `border-color:${color};color:${color};background:${color}22;`;
+        // 底色 = 顏色嘅半透明版（同色系）；邊框 = 特徵顏色；文字 = 特徵顏色（🖤 例外用白字）
+        const st = `border-color:${color};color:${featTextColor(color)};background:${color}22;`;
         return `<span class="chip-mini" style="${st}">${esc(text)}</span>`;
       }
       function featColorsOf(m) {
