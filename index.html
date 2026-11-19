@@ -278,7 +278,6 @@
 
   // ============ 特徵 chips ============
   const FEAT_DEFAULT_COLOR = '#6ee7b7';   // 預設綠色
-      let selectedFeatIdx = null;             // 點選嘅 chip index（改色用）
       $('memoFeat').addEventListener('keydown', e => {
         if (e.key === 'Enter' || e.key === ',') {
           e.preventDefault();
@@ -288,7 +287,6 @@
             $('featColorSelect').value = FEAT_DEFAULT_COLOR;   // 加完重設預設綠
           }
           e.target.value = '';
-          selectedFeatIdx = null;
           renderFeatChips();
         } else if (e.key === 'Backspace' && !e.target.value && pendingFeats.length) {
           pendingFeats.pop();
@@ -296,40 +294,27 @@
         }
       });
       function onFeatColorChange() {
-        // 揀咗 chip → 改該 chip 顏色；冇揀 → 全部 pending chips 改色
-        const c = $('featColorSelect').value;
-        if (selectedFeatIdx !== null && pendingFeats[selectedFeatIdx]) {
-          pendingFeats[selectedFeatIdx].color = c;
-        } else {
-          pendingFeats.forEach(p => p.color = c);
-        }
-        renderFeatChips();
+        // 特徵顏色係獨立控制：只影響「新加入」嘅特徵；已加嘅 chip 顏色唔會跟住變
+        // （要改現有 chip 顏色：去備忘馬清單用「編輯」載入後再揀色）
       }
       function renderFeatChips() {
         $('memoFeatChips').innerHTML = pendingFeats.map((p, i) => {
-          const sel = selectedFeatIdx === i;
-          const st = p.color ? `border-color:${p.color};color:${p.color};` : '';
-          return `<span class="chip" style="${st}${sel ? 'outline:2px solid #fff;' : ''}" title="點選改色" onclick="selectFeat(${i})">${esc(p.text)}<span class="x" onclick="removeFeat(${i});event.stopPropagation();">×</span></span>`;
+          const color = p.color || FEAT_DEFAULT_COLOR;
+          const st = `border-color:${color};color:${color};background:${color}22;`;
+          return `<span class="chip" style="${st}">${esc(p.text)}<span class="x" onclick="removeFeat(${i});event.stopPropagation();">×</span></span>`;
         }).join('');
       }
       function onShortlistChange() {}   // 值由 saveMemo 直接讀取
-      function selectFeat(i) {
-        // 點 chip：選取/取消選取；選取時下拉切到該 chip 顏色
-        selectedFeatIdx = (selectedFeatIdx === i) ? null : i;
-        if (selectedFeatIdx !== null) $('featColorSelect').value = pendingFeats[i].color || FEAT_DEFAULT_COLOR;
-        renderFeatChips();
-      }
       function removeFeat(i) {
         pendingFeats.splice(i, 1);
-        if (selectedFeatIdx === i) selectedFeatIdx = null;
-        else if (selectedFeatIdx !== null && selectedFeatIdx > i) selectedFeatIdx--;
         renderFeatChips();
       }
       // memoChipHtml: colored chip for tables (f can be string or {text,color}); '' color = default green (no inline style)
       function memoChipHtml(f, colors) {
         const text = typeof f === 'object' ? f.text : f;
-        const color = (typeof f === 'object' && f.color) || (colors && colors[text]) || '';
-        const st = color ? `border-color:${color};color:${color};` : '';
+        const color = (typeof f === 'object' && f.color) || (colors && colors[text]) || FEAT_DEFAULT_COLOR;
+        // 底色 = 顏色嘅半透明版（同色系）；文字同邊框 = 特徵顏色
+        const st = `border-color:${color};color:${color};background:${color}22;`;
         return `<span class="chip-mini" style="${st}">${esc(text)}</span>`;
       }
       function featColorsOf(m) {
@@ -375,7 +360,6 @@
       $('memoName').value = ''; $('memoOdds').value = ''; $('memoLast6').value = ''; $('memoFeat').value = '';
       $('memoHotBefore').value = ''; $('memoHot3').value = ''; $('memoHotFlow').value = '';
       $('memoShortlist').value = '';
-      selectedFeatIdx = null;
       pendingFeats = []; renderFeatChips();
     }
   function editMemo(name) {
@@ -390,7 +374,6 @@
     $('memoHotFlow').value = m.hotFlow || '';
     $('memoShortlist').value = m.shortlist || '';
     pendingFeats = [...(m.features || [])];
-    selectedFeatIdx = null;
     renderFeatChips();
     $('memoSaveBtn').textContent = '💾 更新';
     $('memoCancelBtn').style.display = '';
